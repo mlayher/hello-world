@@ -1,133 +1,99 @@
- - name: grower_opportunity_detail
-    description: Opportunity level view of up to date closed won carbon opportunities, qualifiers, and contracts. This is the master view of carbon opportunities and accounts.
+- name: grower_level_summary
+    description: Grower level view of all growers with any fields in Indigo’s databases and/or SF Accounts with Closed Won Carbon Opps, along with key grower characteristics.
     columns:
-      opportunity_id:
-        type: string
-        description: Opportunity ID from SFDC.
-      opportunity_name:
-        type: string
-        description: Opportunity name from SFDC.
       account_id:
         type: string
-        description: SFDC account associated with the opportunity
-      opportunity_date:
+        description: Account ID from SFDC
+      grower_name:
+        type: string
+        description: Grower name
+      grower_id:
+        type: string
+        description: Grower ID
+      carbon_contract_dt:
         type: timestamp_tz
-        description: Opportunity closed won date
-      opportunity_type:
-        type: string
-        description: Type of SFDC opportunity - Carbon or Indigo acres
-      contract_status:
-        type: string
-        description: SFDC status of contract
-      activated_date:
+        description: Date of Carbon contract
+      ifw_enrollment_dt:
         type: timestamp_tz
-        description: Date the contract was activated
-      contract_acres:
+        description: Date of IFW enrollment
+      salesforce_email:
+        type: string
+        description: Grower email address in Salesforce
+      duplicate_salesforce_email:
+        type: boolean
+        description: Boolean indicator that grower email is linked to duplicate SF accounts
+      ifw_email:
+        type: string
+        description: Grower email address in IFW
+      region:
+        type: string
+        description: Grower region
+      practice_changing:
+        type: boolean
+        description: Boolean indicator of whether grower has any practice-changing fields
+      is_acres_grower:
+        type: boolean
+        description: Boolean indicator of Acres grower status
+      is_marketplace_grower:
+        type: boolean
+        description: Boolean indicator if grower is involved in Marketplace  
+      eligible_state:
+        type: boolean
+        description: Boolean indicator of grower in Carbon-eligible state
+      salesforce_carbon_opp_status:
+        type: string
+        description: Boolean indicator if SFDC opportunity has eligible qualifier and closed-won opportunity
+      closed_won_salesforce_opp:
+        type: string
+        description: Boolean if SFDC opportunity is closed-won
+      carbon_tagged_acres:
         type: float
-        description: The total number of acres on the contract.
-      contract_number:
+        description: Total grower acreage mapped for Carbon
+      carbon_enrolled_acres:
         type: float
-        description: Contract number
-      contracts:
-        type: array
-        description: Array of carbon and IA contract numbers associated with that account ID.
-      is_your_land_crop_land_or_pasture_land:
-        type: string
-        description: Response to cropland and pastureland qualifier question in SFDC.
-      cc_cleared_within_10_years:
-        type: string
-        description: Response to land clearing qualifier question in SFDC.
-      carbon_sequestration_compensation:
-        type: string
-        description: Response to existing carbon sequestration qualifier question in SFDC.
-      qualifier_is_eligible_according_to_sfdc:
-        type: boolean
-        description: Boolean indicating if qualifier makes opportunity eligible in SFDC.
-      eligibility_cleared_land:
-        type: string
-        description: IFW response to land clearing qualifier.
-      eligibility_sequestration_program:
-        type: string
-        description: IFW response to carbon compensation qualifier.
-      opp_is_eligible_according_to_ifw:
-        type: boolean
-        description: Boolean indicating if qualifier makes opportunity eligible in IFW.
-      opportunity_is_eligible:
-        type: boolean
-        description: Boolean if SFDC opportunity has eligible qualifier and closed won opportunity.
-      is_eligible_for_carbon:
-        type: boolean
-        description: Final statement on whether opportunity and contract is eligible for carbon.
-      eligibility_source:
-        type: string
-        description:
+        description: Total grower acreage enrolled in Carbon
+      acreage_drawn:
+        type: float
+        description: Total grower acreage drawn in IFM
+      salesforce_contract_acres:
+        type: float
+        description: Total grower acreage contracted in Salesforce
     source: |
-      with QUALIFIER as (
-        select * 
-          from SFDC_QUALIFIER
-          where rank = 1
-      )
-      select o.opportunity_id
-        , o.opportunity_name
-        , o.account_id
-        , o.close_date
-        , o.opportunity_type
-        , c.contract_status
-        , c.activated_date
-        , c.total_acres as contract_acres
-        , c.contract_number
-        , c.contracts
-        , q.is_your_land_crop_land_or_pasture_land
-        , q.cc_cleared_within_10_years
-        , q.carbon_sequestration_compensation
-        , q.qualifier_is_eligible_according_to_sfdc
-        , i.eligibility_cleared_land
-        , i.eligibility_sequestration_program
-        , i.opp_is_eligible_according_to_ifw
-        , case when o.stage_name = 'Closed Won' and q.qualifier_is_eligible_according_to_sfdc = True then True else False end as opportunity_is_eligible
-        , case when c.contract_number is not null and (opportunity_is_eligible or opp_is_eligible_according_to_ifw) then True else False end as is_eligible_for_carbon
-        , case 
-            when ifnull(qualifier_is_eligible_according_to_sfdc, False) AND ifnull(opp_is_eligible_according_to_ifw, False) then 'Both'
-            when ifnull(qualifier_is_eligible_according_to_sfdc, False) and NOT ifnull(opp_is_eligible_according_to_ifw, False) then 'SFDC Only'
-            when ifnull(opp_is_eligible_according_to_ifw, False) and NOT ifnull(qualifier_is_eligible_according_to_sfdc, False) then 'IFW Only'  
-          end as eligibility_source
-        from OPPORTUNITY o
-        left join CONTRACT c
-        on o.opportunity_id = c.opportunity_id
-        left join QUALIFIER q
-        on o.opportunity_id = q.opportunity_id
-        left join IFW_CARBON_QUALIFIER i
-        on o.account_id = i.account_id
-        where o.stage_name = 'Closed Won';
-
-###########################################################################################################################################
-select a.id as account_id
-    , a.email as salesforce_email
---    , a.____ as duplicate_email_flag
-    , b.assigned_commercial_region_c as region
+select 
+    a.id as account_id
+    , d.grower_name as grower_name
+    , d.grower_id as grower_id
     , c.activated_date as carbon_contract_dt
-    , case when e.stage_name = 'Closed Won' then True else False end as is_acres_grower
-    , f.effective_dt as IFW_enrollment_dt
-    , g.state_eligible_for_carbon as eligible_state
-    , h.opportunity_is_eligible as SF_carbon_opp_status
-    , j.user_id as IFW_email
-    , case when (k.mp_supply_profile_count + k.mp_demand_profile_count > 0) then True else False end as MP_involvement 
-    , sum(c.total_acres) as SF_contract_acres
+    , f.effective_dt as ifw_enrollment_dt
+    , a.email as salesforce_email
+    , a.grower_duplicate_email_flag as duplicate_salesforce_email
+    , j.user_id as ifw_email
+    , b.assigned_commercial_region_c as region
+    , d.practice_changing as practice_changing
+    , e.is_acres_grower as is_acres_grower
+    , case when (k.mp_supply_profile_count > 0) then True else False end as is_mp_grower
+    , d.state_eligible_for_carbon as eligible_state
+    , h.opportunity_is_eligible as salesforce_carbon_opp_status    
+    , case when l.stage_name = 'Closed Won' then True else False end as closed_won_salesforce_opp
+    , case when closed_won_salesforce_opp AND f.amends_ID != NULL then True else False end as closed_won_salesforce_and_enrolled_IFW
     , sum(d.acreage) as carbon_tagged_acres
     , sum(case when d.is_carbon = True then d.acreage else 0 end) as carbon_enrolled_acres    
-    from parthenon.accounts.legal_entity a
+    , sum(m.field_acreage) as acreage_drawn
+    , sum(c.total_acres) as salesforce_contract_acres
+    from (select *
+         , (case when (min(id) over (partition by email) = max(id) over (partition by email)) AND email != NULL then 0 else 1 end) as grower_duplicate_email_flag
+         from parthenon.accounts.legal_entity
+         ) as a
     left join parthenon.salesforce_v2.user b
-        on a.id = b.account_id 
-    left join parthenon.carbon.contract c
+        on a.salesforce_owner_id = b.id
+    left join (select legal_entity_id, sum(total_acres) as total_acres, max(activated_date) as activated_date from parthenon.carbon.contract group by 1) c
         on a.id = c.legal_entity_id
-    left join parthenon.carbon.field d
+    left join (select account_id, max(grower_name) as grower_name, max(grower_id) as grower_id, max(is_carbon) as is_carbon, max(state_eligible_for_carbon) as state_eligible_for_carbon, max(has_practice_change) as practice_changing, sum(acreage) as acreage from parthenon.carbon.field group by 1) d 
         on a.id = d.account_id
-    left join parthenon.carbon.indigo_acres_opportunity e
+    left join (select account_id, max(case when stage_name = 'Closed Won' then True else False end) as is_acres_grower from parthenon.carbon.indigo_acres_opportunity group by 1) e
         on a.id = e.account_id
-    left join parthenon.carbon.agreements f
-        on a.id = f.account_id
-    left join parthenon.carbon.states g
-        on d.state = g.state
+    left join (select salesforce_account_id, max(amends_id) as amends_id, max(effective_dt) as effective_dt from parthenon.carbon.agreements group by 1) f
+        on a.id = f.salesforce_account_id
     left join parthenon.carbon.grower_opportunity_detail h
         on a.id = h.account_id
     left join parthenon.dca_db.dca_growers i
@@ -136,6 +102,13 @@ select a.id as account_id
         on i.id = j.id
     left join parthenon.accounts.salesforce_account_summary k
         on a.id = k.salesforce_account_id
-    group by 1,2,3,4,5,6,7,8,9,10
-    limit 50
+    left join (SELECT account_id, stage_name, close_date 
+        , ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY close_date DESC) AS rownum
+        FROM parthenon.carbon.opportunity) l
+        on a.id = l.account_id
+    left join (select salesforce_acct_id, sum(field_acreage) as field_acreage from parthenon.agronomy.dca_grower_farm_field group by 1) m
+        on a.id = m.salesforce_acct_id
+    where l.rownum = 1
+    group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+   
         
